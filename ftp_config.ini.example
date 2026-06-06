@@ -1,0 +1,11 @@
+[mein-server]
+host = ftp.beispiel.de
+port = 21
+username = benutzername
+password = passwort
+
+[zweiter-server]
+host = ftp.anderer.de
+port = 21
+username = benutzer2
+password = passwort2
