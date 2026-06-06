@@ -1,8 +1,8 @@
 # mcp-ftp-win — Windows Edition
 
-MCP server that provides FTP access for [Claude Code](https://claude.ai/code) — **Windows-native version**.
+MCP server that provides **FTP / FTPS / SFTP** access for [Claude Code](https://claude.ai/code) — Windows-native version.
 
-Runs as an isolated local user (`mcpftp`) via a scheduled task. FTP credentials are stored in
+Runs as an isolated local user (`mcpftp`) via a scheduled task. Credentials are stored in
 `C:\ProgramData\mcp-ftp\ftp_config.ini` with NTFS permissions that block access from
 non-elevated processes — so Claude Code cannot read them.
 
@@ -62,27 +62,25 @@ Set-ExecutionPolicy -Scope Process Bypass
 The script will:
 - Prompt you for a password for the new `mcpftp` user
 - Create the local standard user `mcpftp`
-- Install server code to `C:\Program Files\mcp-ftp\` with a Python venv
+- Install server code to `C:\Program Files\mcp-ftp\` with a Python venv (includes `mcp` + `paramiko`)
 - Create `C:\ProgramData\mcp-ftp\ftp_config.ini` (from the example) with strict NTFS rights
 - Create `C:\ProgramData\mcp-ftp\exchange\` (read/write for both `mcpftp` and normal users)
 - Register and start a scheduled task `mcp-ftp` running as `mcpftp`
 
-### Step 4 — Enter your FTP credentials
+### Step 4 — Enter your credentials
 
 #### Option A — GUI (recommended)
 
 Right-click `mcp_ftp_config_gui.ps1` in the cloned repo folder and choose **Run as administrator**.
-
-![GUI: server list on the left, fields for Name / Host / Port / Username / Password on the right]
-
-The GUI will auto-elevate via UAC if needed. Use it to:
+The GUI auto-elevates via UAC if needed.
 
 - **Add** a server: click **Neu**, fill in the fields, click **Speichern**
-- **Edit** a server: select it in the list, click **Bearbeiten**, change the fields, click **Speichern**
+- **Edit** a server: select it in the list, click **Bearbeiten**, make changes, click **Speichern**
 - **Delete** a server: select it in the list, click **Löschen**
-- The checkbox **"Dienst nach dem Speichern neu starten"** restarts the scheduled task automatically after saving (on by default)
+- The **Typ** dropdown selects the protocol (ftp / ftps / sftp) and auto-fills the default port
+- The checkbox **"Dienst nach dem Speichern neu starten"** restarts the scheduled task automatically (on by default)
 
-You can also start the GUI from an elevated PowerShell:
+You can also launch the GUI from an elevated PowerShell:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
@@ -96,17 +94,32 @@ Right-click Notepad → **Run as administrator**, then open:
 C:\ProgramData\mcp-ftp\ftp_config.ini
 ```
 
-Format — one block per server:
+Each server is one INI block. The `type` field is optional and defaults to `ftp`:
 
 ```ini
-[mein-server]
-host = ftp.beispiel.de
-port = 21
-username = benutzername
-password = passwort
+[my-ftp-server]
+type     = ftp
+host     = ftp.example.com
+port     = 21
+username = user
+password = secret
+
+[my-ftps-server]
+type     = ftps
+host     = ftp.example.com
+port     = 21
+username = user
+password = secret
+
+[my-sftp-server]
+type     = sftp
+host     = ssh.example.com
+port     = 22
+username = user
+password = secret
 ```
 
-After saving, restart the task manually:
+After saving, restart the task:
 ```powershell
 Stop-ScheduledTask  -TaskName mcp-ftp
 Start-ScheduledTask -TaskName mcp-ftp
@@ -115,7 +128,7 @@ Start-ScheduledTask -TaskName mcp-ftp
 ### Step 5 — Verify
 
 ```powershell
-schtasks /Query /TN mcp-ftp /FO LIST
+Get-ScheduledTask -TaskName mcp-ftp | Select-Object -ExpandProperty State
 ```
 
 The MCP tools become available in Claude Code once the scheduled task is running.
@@ -137,17 +150,55 @@ Both `mcpftp` and your normal user account have read/write access to this folder
 
 ## Available tools
 
+### Diagnostics
+
 | Tool | Description |
 |------|-------------|
 | `list_servers` | List all configured server names |
-| `list_directory` | List files and folders in a directory on a server |
-| `upload_file` | Upload a file from the exchange folder to the FTP server |
-| `download_file` | Download a file from the FTP server into the exchange folder |
-| `delete_file` | Delete a file on the FTP server |
-| `rename_file` | Rename or move a file on the FTP server |
-| `make_directory` | Create a directory on the FTP server |
-| `get_permissions` | Show the permissions (chmod) of a file or directory |
-| `set_permissions` | Set the permissions (chmod) of a file or directory |
+| `test_connection` | Check that a server is reachable and credentials are correct |
+
+### Browsing
+
+| Tool | Description |
+|------|-------------|
+| `list_directory` | List files and folders in a directory |
+| `find_files` | Recursively search for files by name pattern (e.g. `*.log`, `backup_*`) |
+| `get_file_info` | Show size, modification time and permissions of a file |
+| `read_text_file` | Read a text file directly as a string (no download needed) |
+
+### Transfer
+
+| Tool | Description |
+|------|-------------|
+| `upload_file` | Upload a single file from the exchange folder to the server |
+| `download_file` | Download a single file from the server into the exchange folder |
+| `upload_directory` | Recursively upload a folder from the exchange folder to the server |
+| `download_directory` | Recursively download a remote folder into the exchange folder |
+
+### File operations
+
+| Tool | Description |
+|------|-------------|
+| `delete_file` | Delete a file on the server |
+| `rename_file` | Rename or move a file on the server |
+| `make_directory` | Create a directory on the server |
+| `remove_directory` | Remove an empty directory on the server |
+| `get_permissions` | Show the chmod permissions of a file or directory |
+| `set_permissions` | Set the chmod permissions of a file or directory |
+
+---
+
+## Updating
+
+To pull the latest version from GitHub and restart the service, run as Administrator:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+& "$HOME\mcp-ftp-win\update.ps1"
+```
+
+The script stops the scheduled task, runs `git pull`, copies the new `ftp_server.py` to
+`C:\Program Files\mcp-ftp\`, upgrades Python packages, and starts the task again.
 
 ---
 
@@ -169,7 +220,7 @@ If the file is readable: the NTFS permissions are wrong — re-run the setup scr
 Paste this into Claude Code:
 
 ```
-Install the MCP FTP server (Windows) from https://github.com/ipod86/mcp-ftp-win:
+Install the MCP FTP/SFTP server (Windows) from https://github.com/ipod86/mcp-ftp-win:
 clone the repo to %USERPROFILE%\mcp-ftp-win, then run:
   claude mcp add --transport sse ftp-win http://127.0.0.1:8765/sse
 After that, run windows_admin_setup.ps1 as Administrator (outside Claude Code).
