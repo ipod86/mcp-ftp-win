@@ -89,19 +89,19 @@ class Connection:
         return lines
 
     def _entries(self, path: str) -> list[tuple[str, bool]]:
-        """[(name, is_dir), ...] for immediate children of path."""
+        """[(name, is_dir), ...] for immediate children of path (. and .. excluded)."""
         if self.is_sftp:
             return [
                 (a.filename, stat.S_ISDIR(a.st_mode))
                 for a in self._sftp.listdir_attr(path)
-                if a.st_mode is not None
+                if a.st_mode is not None and a.filename not in (".", "..")
             ]
         lines: list[str] = []
         self._ftp.retrlines(f"LIST {path}", lines.append)
         result = []
         for line in lines:
             parts = line.split(None, 8)
-            if len(parts) >= 9:
+            if len(parts) >= 9 and parts[8] not in (".", ".."):
                 result.append((parts[8], line[0] == "d"))
         return result
 
