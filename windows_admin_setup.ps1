@@ -49,7 +49,7 @@ New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 Copy-Item "$Repo\ftp_server.py" $AppDir -Force
 
 py -m venv "$AppDir\venv"
-& "$AppDir\venv\Scripts\python.exe" -m pip install mcp --quiet
+& "$AppDir\venv\Scripts\python.exe" -m pip install mcp paramiko --quiet
 
 # Eigentuemer auf Admins setzen (verhindert WRITE_DAC ueber Alltagsbenutzer-SID)
 icacls $AppDir /setowner "*S-1-5-32-544" /T | Out-Null
