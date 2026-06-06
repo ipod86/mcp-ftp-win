@@ -100,16 +100,11 @@ Write-Host "  Austauschordner-Rechte gesetzt." -ForegroundColor Green
 # -----------------------------------------------------------------------
 Write-Host "Erstelle geplante Aufgabe 'mcp-ftp'..." -ForegroundColor Yellow
 
-$taskAction = New-ScheduledTaskAction `
-    -Execute "$AppDir\venv\Scripts\python.exe" `
+$taskAction   = New-ScheduledTaskAction `
+    -Execute  "$AppDir\venv\Scripts\python.exe" `
     -Argument "`"$AppDir\ftp_server.py`""
 
-$taskTrigger = New-ScheduledTaskTrigger -AtStartup
-
-$taskPrincipal = New-ScheduledTaskPrincipal `
-    -UserId    "mcpftp" `
-    -LogonType Password `
-    -RunLevel  Limited
+$taskTrigger  = New-ScheduledTaskTrigger -AtStartup
 
 $taskSettings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit ([TimeSpan]::Zero) `
@@ -117,13 +112,16 @@ $taskSettings = New-ScheduledTaskSettingsSet `
     -RestartInterval    (New-TimeSpan -Minutes 1) `
     -MultipleInstances  IgnoreNew
 
+# -Principal und -Password zusammen sind ungueltig -- stattdessen
+# -User / -Password / -RunLevel direkt an Register-ScheduledTask uebergeben
 Register-ScheduledTask `
-    -TaskName  "mcp-ftp" `
-    -Action    $taskAction `
-    -Trigger   $taskTrigger `
-    -Principal $taskPrincipal `
-    -Settings  $taskSettings `
-    -Password  $pwPlain `
+    -TaskName "mcp-ftp" `
+    -Action   $taskAction `
+    -Trigger  $taskTrigger `
+    -Settings $taskSettings `
+    -User     "mcpftp" `
+    -Password $pwPlain `
+    -RunLevel Limited `
     -Force | Out-Null
 
 Start-ScheduledTask -TaskName "mcp-ftp"
