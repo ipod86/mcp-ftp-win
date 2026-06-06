@@ -69,6 +69,28 @@ The script will:
 
 ### Step 4 — Enter your FTP credentials
 
+#### Option A — GUI (recommended)
+
+Right-click `mcp_ftp_config_gui.ps1` in the cloned repo folder and choose **Run as administrator**.
+
+![GUI: server list on the left, fields for Name / Host / Port / Username / Password on the right]
+
+The GUI will auto-elevate via UAC if needed. Use it to:
+
+- **Add** a server: click **Neu**, fill in the fields, click **Speichern**
+- **Edit** a server: select it in the list, click **Bearbeiten**, change the fields, click **Speichern**
+- **Delete** a server: select it in the list, click **Löschen**
+- The checkbox **"Dienst nach dem Speichern neu starten"** restarts the scheduled task automatically after saving (on by default)
+
+You can also start the GUI from an elevated PowerShell:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+& "$HOME\mcp-ftp-win\mcp_ftp_config_gui.ps1"
+```
+
+#### Option B — Notepad (manual)
+
 Right-click Notepad → **Run as administrator**, then open:
 ```
 C:\ProgramData\mcp-ftp\ftp_config.ini
@@ -84,9 +106,10 @@ username = benutzername
 password = passwort
 ```
 
-Then restart the task:
+After saving, restart the task manually:
 ```powershell
-schtasks /End /TN mcp-ftp ; schtasks /Run /TN mcp-ftp
+Stop-ScheduledTask  -TaskName mcp-ftp
+Start-ScheduledTask -TaskName mcp-ftp
 ```
 
 ### Step 5 — Verify
