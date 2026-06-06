@@ -25,18 +25,20 @@ $pw = Read-Host "Passwort fuer neuen Benutzer 'mcpftp' festlegen" -AsSecureStrin
 $pwPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
     [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
 
-Write-Host "Lege Benutzer 'mcpftp' an..." -ForegroundColor Yellow
-net user mcpftp $pwPlain /add /passwordchg:no | Out-Null
-# PasswordExpires=false (wmic ist deprecated ab Win11 24H2, net user hat kein Flag dafuer)
-$localUser = Get-LocalUser -Name "mcpftp"
-$localUser | Set-LocalUser -PasswordNeverExpires $true
+if (-not (Get-LocalUser -Name "mcpftp" -ErrorAction SilentlyContinue)) {
+    Write-Host "Lege Benutzer 'mcpftp' an..." -ForegroundColor Yellow
+    net user mcpftp $pwPlain /add /passwordchg:no | Out-Null
+    Get-LocalUser -Name "mcpftp" | Set-LocalUser -PasswordNeverExpires $true
+    Write-Host "  Benutzer 'mcpftp' angelegt (Standardbenutzer)." -ForegroundColor Green
+} else {
+    Write-Host "  Benutzer 'mcpftp' existiert bereits -- wird uebersprungen." -ForegroundColor DarkGray
+}
 # Sicherstellen: mcpftp ist NICHT in der Administratorengruppe
-$admins = (Get-LocalGroupMember -SID "S-1-5-32-544" | Where-Object { $_.Name -match "mcpftp" })
+$admins = (Get-LocalGroupMember -SID "S-1-5-32-544" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "mcpftp" })
 if ($admins) {
     Remove-LocalGroupMember -SID "S-1-5-32-544" -Member "mcpftp"
     Write-Host "  mcpftp aus Administratorengruppe entfernt." -ForegroundColor Yellow
 }
-Write-Host "  Benutzer 'mcpftp' angelegt (Standardbenutzer)." -ForegroundColor Green
 
 # -----------------------------------------------------------------------
 # 2) Server-Code installieren
@@ -110,11 +112,10 @@ $taskPrincipal = New-ScheduledTaskPrincipal `
     -RunLevel  Limited
 
 $taskSettings = New-ScheduledTaskSettingsSet `
-    -ExecutionTimeLimit  ([TimeSpan]::Zero) `
-    -RestartCount        3 `
-    -RestartInterval     (New-TimeSpan -Minutes 1) `
-    -MultipleInstances   IgnoreNew `
-    -DisallowHardTerminate $false
+    -ExecutionTimeLimit ([TimeSpan]::Zero) `
+    -RestartCount       3 `
+    -RestartInterval    (New-TimeSpan -Minutes 1) `
+    -MultipleInstances  IgnoreNew
 
 Register-ScheduledTask `
     -TaskName  "mcp-ftp" `
