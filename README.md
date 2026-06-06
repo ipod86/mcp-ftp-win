@@ -156,6 +156,7 @@ Both `mcpftp` and your normal user account have read/write access to this folder
 |------|-------------|
 | `list_servers` | List all configured server names |
 | `test_connection` | Check that a server is reachable and credentials are correct |
+| `get_server_info` | Show server banner, welcome message and supported features |
 
 ### Browsing
 
@@ -163,7 +164,10 @@ Both `mcpftp` and your normal user account have read/write access to this folder
 |------|-------------|
 | `list_directory` | List files and folders in a directory |
 | `find_files` | Recursively search for files by name pattern (e.g. `*.log`, `backup_*`) |
+| `search_file_content` | Search for text within files — grep-like, returns file, line number, content |
 | `get_file_info` | Show size, modification time and permissions of a file |
+| `get_directory_size` | Calculate total size of all files in a directory (recursive) |
+| `list_large_files` | Find files above a size threshold, sorted largest first |
 | `read_text_file` | Read a text file directly as a string (no download needed) |
 
 ### Transfer
@@ -174,12 +178,16 @@ Both `mcpftp` and your normal user account have read/write access to this folder
 | `download_file` | Download a single file from the server into the exchange folder |
 | `upload_directory` | Recursively upload a folder from the exchange folder to the server |
 | `download_directory` | Recursively download a remote folder into the exchange folder |
+| `sync_directory` | Upload only new or changed files from the exchange folder (size-based, like rsync) |
+| `write_text_file` | Write text content directly to a file on the server (no exchange folder needed) |
 
 ### File operations
 
 | Tool | Description |
 |------|-------------|
+| `copy_file` | Copy a file to a new location on the same server (buffered in memory) |
 | `delete_file` | Delete a file on the server |
+| `bulk_delete` | Delete all files matching a name pattern in a directory (recursive) |
 | `rename_file` | Rename or move a file on the server |
 | `make_directory` | Create a directory on the server |
 | `remove_directory` | Remove an empty directory on the server |
