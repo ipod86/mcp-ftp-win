@@ -101,7 +101,7 @@ Write-Host "  Austauschordner-Rechte gesetzt." -ForegroundColor Green
 Write-Host "Erstelle geplante Aufgabe 'mcp-ftp'..." -ForegroundColor Yellow
 
 $taskAction   = New-ScheduledTaskAction `
-    -Execute  "$AppDir\venv\Scripts\python.exe" `
+    -Execute  "$AppDir\venv\Scripts\pythonw.exe" `
     -Argument "`"$AppDir\ftp_server.py`""
 
 $taskTrigger  = New-ScheduledTaskTrigger -AtStartup

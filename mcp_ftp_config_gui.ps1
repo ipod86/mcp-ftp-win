@@ -290,7 +290,7 @@ $btnDelete.Add_Click({
 $btnSave.Add_Click({
     $lblStatus.Text = ""
     $newName = $tbName.Text.Trim()
-    $host    = $tbHost.Text.Trim()
+    $ftpHost = $tbHost.Text.Trim()
     $port    = $tbPort.Text.Trim()
     $user    = $tbUser.Text.Trim()
     $pass    = $tbPass.Text  # kein Trim bei Passwort
@@ -301,7 +301,7 @@ $btnSave.Add_Click({
         $tbName.Focus() | Out-Null
         return
     }
-    if (-not $host) {
+    if (-not $ftpHost) {
         $lblStatus.ForeColor = [System.Drawing.Color]::DarkRed
         $lblStatus.Text = "Fehler: Host darf nicht leer sein."
         $tbHost.Focus() | Out-Null
@@ -321,7 +321,7 @@ $btnSave.Add_Click({
     }
 
     $section = [ordered]@{}
-    $section["host"]     = $host
+    $section["host"]     = $ftpHost
     $section["port"]     = if ($port) { $port } else { "21" }
     $section["username"] = $user
     $section["password"] = $pass
