@@ -49,13 +49,15 @@ Copy-Item "$Repo\ftp_server.py" $AppDir -Force
 py -m venv "$AppDir\venv"
 & "$AppDir\venv\Scripts\python.exe" -m pip install mcp --quiet
 
+# Eigentuemer auf Admins setzen (verhindert WRITE_DAC ueber Alltagsbenutzer-SID)
+icacls $AppDir /setowner "*S-1-5-32-544" /T | Out-Null
 # Rechte: Admins voll, Benutzer (S-1-5-32-545) und mcpftp lesen/ausfuehren
 icacls $AppDir /inheritance:r | Out-Null
 icacls $AppDir /grant "*S-1-5-18:(OI)(CI)(F)"      | Out-Null  # SYSTEM voll
 icacls $AppDir /grant "*S-1-5-32-544:(OI)(CI)(F)"  | Out-Null  # Administratoren voll
 icacls $AppDir /grant "*S-1-5-32-545:(OI)(CI)(RX)" | Out-Null  # Benutzer lesen/ausfuehren
 icacls $AppDir /grant "mcpftp:(OI)(CI)(RX)"        | Out-Null  # Dienstbenutzer lesen/ausfuehren
-Write-Host "  $AppDir eingerichtet." -ForegroundColor Green
+Write-Host "  $AppDir eingerichtet (Eigentuemer: Administratoren)." -ForegroundColor Green
 
 # -----------------------------------------------------------------------
 # 3) Datenverzeichnis + Austauschordner
@@ -70,12 +72,14 @@ Copy-Item "$Repo\ftp_config.ini.example" $Cfg -Force
 #    SYSTEM + mcpftp: Lesen; Administratoren: Vollzugriff (nur erhoeht nutzbar)
 #    KEIN Zugriff fuer normale Benutzer (S-1-5-32-545) oder Jeder
 # -----------------------------------------------------------------------
-Write-Host "Setze Rechte auf $Cfg ..." -ForegroundColor Yellow
+Write-Host "Setze Eigentuemer und Rechte auf $Cfg ..." -ForegroundColor Yellow
+# Eigentuemer auf Admins setzen (kein WRITE_DAC ueber ungefilterte Benutzer-SID)
+icacls $Cfg /setowner "*S-1-5-32-544" | Out-Null
 icacls $Cfg /inheritance:r             | Out-Null
 icacls $Cfg /grant "*S-1-5-18:(R)"    | Out-Null  # SYSTEM lesen
 icacls $Cfg /grant "mcpftp:(R)"       | Out-Null  # Dienstbenutzer lesen
 icacls $Cfg /grant "*S-1-5-32-544:(F)"| Out-Null  # Administratoren voll (nur erhoeht!)
-Write-Host "  Config-Rechte gesetzt (normale Benutzer haben keinen Zugriff)." -ForegroundColor Green
+Write-Host "  Config-Rechte gesetzt (Eigentuemer: Administratoren, normale Benutzer kein Zugriff)." -ForegroundColor Green
 
 # -----------------------------------------------------------------------
 # 5) Austauschordner: mcpftp + normale Benutzer duerfen lesen/schreiben
@@ -89,13 +93,40 @@ icacls $Exch /grant "*S-1-5-32-545:(OI)(CI)(M)"   | Out-Null  # Benutzer aendern
 Write-Host "  Austauschordner-Rechte gesetzt." -ForegroundColor Green
 
 # -----------------------------------------------------------------------
-# 6) Geplante Aufgabe: Server als mcpftp, eingeschraenkt, beim Systemstart
+# 6) Geplante Aufgabe: Server als mcpftp, eingeschraenkt, beim Systemstart,
+#    kein Zeitlimit, Neustart bei Absturz
 # -----------------------------------------------------------------------
 Write-Host "Erstelle geplante Aufgabe 'mcp-ftp'..." -ForegroundColor Yellow
-$action = "`"$AppDir\venv\Scripts\python.exe`" `"$AppDir\ftp_server.py`""
-schtasks /Create /TN "mcp-ftp" /TR $action /SC ONSTART /RU mcpftp /RP $pwPlain /RL LIMITED /F | Out-Null
-schtasks /Run /TN "mcp-ftp" | Out-Null
-Write-Host "  Geplante Aufgabe erstellt und gestartet." -ForegroundColor Green
+
+$taskAction = New-ScheduledTaskAction `
+    -Execute "$AppDir\venv\Scripts\python.exe" `
+    -Argument "`"$AppDir\ftp_server.py`""
+
+$taskTrigger = New-ScheduledTaskTrigger -AtStartup
+
+$taskPrincipal = New-ScheduledTaskPrincipal `
+    -UserId    "mcpftp" `
+    -LogonType Password `
+    -RunLevel  Limited
+
+$taskSettings = New-ScheduledTaskSettingsSet `
+    -ExecutionTimeLimit  ([TimeSpan]::Zero) `
+    -RestartCount        3 `
+    -RestartInterval     (New-TimeSpan -Minutes 1) `
+    -MultipleInstances   IgnoreNew `
+    -DisallowHardTerminate $false
+
+Register-ScheduledTask `
+    -TaskName  "mcp-ftp" `
+    -Action    $taskAction `
+    -Trigger   $taskTrigger `
+    -Principal $taskPrincipal `
+    -Settings  $taskSettings `
+    -Password  $pwPlain `
+    -Force | Out-Null
+
+Start-ScheduledTask -TaskName "mcp-ftp"
+Write-Host "  Geplante Aufgabe erstellt und gestartet (kein Zeitlimit, Neustart bei Absturz)." -ForegroundColor Green
 
 # -----------------------------------------------------------------------
 # Fertig
@@ -104,17 +135,18 @@ Write-Host ""
 Write-Host "=== Fertig ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "Status pruefen:" -ForegroundColor Cyan
-Write-Host "  schtasks /Query /TN mcp-ftp /FO LIST"
+Write-Host "  Get-ScheduledTask -TaskName mcp-ftp | Select-Object -ExpandProperty State"
 Write-Host ""
 Write-Host "Zugangsdaten eintragen (als Administrator):" -ForegroundColor Cyan
 Write-Host "  Rechtsklick auf Notepad -> Als Administrator ausfuehren"
 Write-Host "  Datei oeffnen: $Cfg"
 Write-Host "  Je Server einen Block [name] mit host / port / username / password eintragen."
 Write-Host ""
-Write-Host "Dienst neu starten nach Aenderungen:" -ForegroundColor Cyan
-Write-Host "  schtasks /End /TN mcp-ftp ; schtasks /Run /TN mcp-ftp"
+Write-Host "Aufgabe stoppen / neu starten nach Aenderungen:" -ForegroundColor Cyan
+Write-Host "  Stop-ScheduledTask  -TaskName mcp-ftp"
+Write-Host "  Start-ScheduledTask -TaskName mcp-ftp"
 Write-Host ""
-Write-Host "Sicherheits-Check (in normaler, nicht erhoehter PowerShell):" -ForegroundColor Cyan
+Write-Host "Sicherheits-Check (in normaler, NICHT erhoehter PowerShell):" -ForegroundColor Cyan
 Write-Host "  Get-Content C:\ProgramData\mcp-ftp\ftp_config.ini"
 Write-Host "  --> Erwartet: 'Zugriff verweigert'. Falls lesbar: Rechte pruefen!"
 Write-Host ""

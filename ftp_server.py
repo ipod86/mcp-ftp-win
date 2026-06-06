@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 CONFIG_PATH  = Path(r"C:\ProgramData\mcp-ftp\ftp_config.ini")
 EXCHANGE_DIR = Path(r"C:\ProgramData\mcp-ftp\exchange")
 
-mcp = FastMCP("ftp", host="127.0.0.1", port=8765)
+mcp = FastMCP("ftp-win", host="127.0.0.1", port=8765)
 
 
 def _load_config() -> configparser.ConfigParser:
